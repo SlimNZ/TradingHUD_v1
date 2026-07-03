@@ -1,2 +1,39 @@
 # TradingHUD_v1
 Trading Dashboard (Calendar with Daily PnL, Winrate, # of trades)
+
+A monthly trade-journal calendar for Hyperliquid traders. Paste your main wallet
+address and the app pulls your on-chain fills, groups them into round-trip
+trades, and renders them as a color-coded calendar: green days = net profit,
+red = net loss, with per-day trade lists, month stats, and a cumulative P&L
+sparkline.
+
+## Run locally
+
+```bash
+cd trade-journal
+npm install
+npm run dev     # open the printed localhost URL (default http://localhost:5173)
+```
+
+Paste your Hyperliquid **main account address** (not an agent/API wallet — those
+return no fills), or click **Try demo data** to explore with a sample dataset.
+
+## How it works
+
+- `trade-journal/` — Vite + React + TypeScript app.
+  - `src/lib/hyperliquid.ts` — data layer: fetches fills from the public
+    Hyperliquid info API (paged via `userFillsByTime`, up to the ~10k-fill
+    lookback), groups them into round-trip trades, and rolls them up into the
+    `JournalMonth` payload the UI renders. No API key needed; read-only.
+  - `src/components/` — `ConnectGate`, `LeftStats` (+ sparkline),
+    `CalendarGrid` (day cells + weekly totals), `DetailPanel` (trade cards).
+- In dev, API calls go through a Vite proxy (`/hl-api` →
+  `https://api.hyperliquid.xyz`) so CORS can never bite; production builds call
+  the API directly.
+- Month arrows page through every month that has trade history. All times are
+  bucketed into sessions (NY Open / London / Asia / NY PM) in
+  `America/New_York`.
+
+Notes: the journal shows **realized round trips** (positions returned to flat);
+still-open positions are excluded. TP/SL display is supported by the UI but not
+populated from fills — wire resting trigger orders if you want it.

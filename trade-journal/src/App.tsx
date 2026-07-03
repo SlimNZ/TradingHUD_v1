@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { availableMonths, buildMonth, fetchUserFills, groupFills } from './lib/hyperliquid'
+import { availableMonths, buildMonth, fetchSpotMeta, fetchUserFills, groupFills } from './lib/hyperliquid'
 import type { RoundTrip } from './lib/hyperliquid'
 import { DEMO_FILL_COUNT, DEMO_WALLET, demoTags, demoTrips } from './lib/demo'
 import { ConnectGate } from './components/ConnectGate'
@@ -37,13 +37,13 @@ export default function App() {
     if (!/^0x[0-9a-fA-F]{40}$/.test(w)) {
       throw new Error('That does not look like a wallet address (expected 0x + 40 hex characters).')
     }
-    const fills = await fetchUserFills(w)
+    const [fills, spotNames] = await Promise.all([fetchUserFills(w), fetchSpotMeta()])
     if (!fills.length) {
       throw new Error(
         'No fills found for this address. Make sure it is your MAIN account address — agent/API wallets return empty results.',
       )
     }
-    const trips = groupFills(fills, TZ)
+    const trips = groupFills(fills, TZ, spotNames)
     if (!trips.length) {
       throw new Error('Fills were found, but no completed round-trip trades yet.')
     }

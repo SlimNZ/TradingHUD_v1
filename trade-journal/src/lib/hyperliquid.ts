@@ -33,11 +33,17 @@ export interface Trade {
   size: number
   pnl: number
   fee: number
+  partial?: boolean // true = scale-out of a position that stayed open past this day
   tp: number | null // not present in fills; populate from trigger orders if fetched
   sl: number | null
 }
 
-/** A completed round-trip trade, keyed to the calendar day it was opened. */
+/**
+ * One day's realized slice of a round-trip trade, keyed to the calendar day
+ * the P&L was realized (the day the closing fills happened). A position
+ * closed within one day yields a single segment; a position scaled out over
+ * N days yields N segments whose pnl sums to the trade's total.
+ */
 export interface RoundTrip extends Trade {
   iso: string // "2026-02-26"
   monthKey: string // "2026-02"
@@ -86,9 +92,9 @@ export function sessionForMinutes(min: number): string {
 }
 
 // Normalize Hyperliquid coin symbols to display tickers.
-export function displayAsset(coin: string): string {
+export function displayAsset(coin: string, spotNames?: Record<string, string>): string {
   if (!coin) return '?'
-  if (coin.startsWith('@')) return coin // spot indices; map via spotMeta if desired
+  if (coin.startsWith('@')) return spotNames?.[coin] ?? coin // spot index -> base token
   if (coin.includes(':')) return coin.split(':').pop() as string // HIP-3 "dex:SYM"
   return coin
 }
@@ -96,16 +102,21 @@ export function displayAsset(coin: string): string {
 const round2 = (n: number) => Math.round(n * 100) / 100
 const round4 = (n: number) => Math.round(n * 10000) / 10000
 
+interface DayBucket {
+  pnl: number
+  fee: number
+  exitNotional: number
+  exitSize: number
+  firstCloseMs: number | null
+}
+
 interface OpenTrade {
   coin: string
   dirLong: boolean
   firstMs: number
   entryNotional: number
   entrySize: number
-  exitNotional: number
-  exitSize: number
-  pnl: number
-  fee: number
+  days: Map<string, DayBucket> // iso -> that day's realized activity, in order
 }
 
 function tzParts(ms: number, tz: string) {
@@ -129,33 +140,70 @@ function tzParts(ms: number, tz: string) {
 }
 
 /**
- * Group a flat list of fills into completed round-trip trades.
- * A trade opens when the position leaves flat and closes when it returns to
- * flat. A fill that flips the position (long -> short in one print) closes
- * the current trade and opens a new one with the remainder.
+ * Group a flat list of fills into per-day realized trade segments.
+ * A trade opens when the position leaves flat and completes when it returns
+ * to flat. Its P&L is booked on the day(s) the closing fills actually
+ * happened — a position scaled out across N days emits N segments (earlier
+ * ones flagged `partial`), matching how Hyperliquid attributes realized P&L.
+ * A fill that flips the position (long -> short in one print) completes the
+ * current trade and opens a new one with the remainder.
+ * Positions still open at the end of the data emit their realized-to-date
+ * segments too (all flagged `partial`), so day totals always reconcile with
+ * the sum of fill closedPnl.
  */
-export function groupFills(rawFills: RawFill[], tz: string): RoundTrip[] {
+export function groupFills(
+  rawFills: RawFill[],
+  tz: string,
+  spotNames?: Record<string, string>,
+): RoundTrip[] {
   const fills = [...rawFills].sort((a, b) => a.time - b.time)
   const open: Record<string, OpenTrade> = {}
   const trips: RoundTrip[] = []
 
-  const close = (t: OpenTrade) => {
-    const p0 = tzParts(t.firstMs, tz)
-    trips.push({
-      iso: p0.iso,
-      monthKey: p0.iso.slice(0, 7),
-      dayNum: p0.dayNum,
-      time: p0.hhmm,
-      session: sessionForMinutes(p0.minutes),
-      asset: displayAsset(t.coin),
-      dir: t.dirLong ? 'LONG' : 'SHORT',
-      entry: t.entrySize ? t.entryNotional / t.entrySize : 0,
-      exit: t.exitSize ? t.exitNotional / t.exitSize : 0,
-      size: round4(Math.max(t.entrySize, t.exitSize)),
-      pnl: round2(t.pnl),
-      fee: round2(t.fee),
-      tp: null,
-      sl: null,
+  const bucketFor = (t: OpenTrade, iso: string): DayBucket => {
+    let b = t.days.get(iso)
+    if (!b) {
+      b = { pnl: 0, fee: 0, exitNotional: 0, exitSize: 0, firstCloseMs: null }
+      t.days.set(iso, b)
+    }
+    return b
+  }
+
+  // Emit one segment per day that realized P&L. Fees from days with only
+  // opening fills roll into the first realized segment so the trade's total
+  // fee is preserved. stillOpen = position not yet flat: every segment is
+  // partial, and fee carry stays with the live trade for its final segment.
+  const emitSegments = (t: OpenTrade, stillOpen: boolean) => {
+    const entry = t.entrySize ? t.entryNotional / t.entrySize : 0
+    const realized = [...t.days.entries()].filter(
+      ([, b]) => b.exitSize > 0 || Math.abs(b.pnl) > 1e-9,
+    )
+    if (!realized.length) return
+    let openOnlyFees = 0
+    if (!stillOpen) {
+      for (const [, b] of t.days) {
+        if (!(b.exitSize > 0 || Math.abs(b.pnl) > 1e-9)) openOnlyFees += b.fee
+      }
+    }
+    realized.forEach(([iso, b], i) => {
+      const p = tzParts(b.firstCloseMs ?? t.firstMs, tz)
+      trips.push({
+        iso,
+        monthKey: iso.slice(0, 7),
+        dayNum: parseInt(iso.slice(8), 10),
+        time: p.hhmm,
+        session: sessionForMinutes(p.minutes),
+        asset: displayAsset(t.coin, spotNames),
+        dir: t.dirLong ? 'LONG' : 'SHORT',
+        entry,
+        exit: b.exitSize ? b.exitNotional / b.exitSize : 0,
+        size: round4(b.exitSize),
+        pnl: round2(b.pnl),
+        fee: round2(b.fee + (i === 0 ? openOnlyFees : 0)),
+        partial: stillOpen || i < realized.length - 1,
+        tp: null,
+        sl: null,
+      })
     })
   }
 
@@ -172,6 +220,7 @@ export function groupFills(rawFills: RawFill[], tz: string): RoundTrip[] {
     const wasFlat = Math.abs(startPos) < eps
     const increasing = wasFlat || startPos > 0 === signed > 0
     const flips = !wasFlat && Math.abs(endPos) > eps && startPos > 0 !== endPos > 0
+    const iso = tzParts(f.time, tz).iso
 
     let t = open[f.coin]
     if (!t) {
@@ -183,10 +232,7 @@ export function groupFills(rawFills: RawFill[], tz: string): RoundTrip[] {
         firstMs: f.time,
         entryNotional: 0,
         entrySize: 0,
-        exitNotional: 0,
-        exitSize: 0,
-        pnl: 0,
-        fee: 0,
+        days: new Map(),
       }
     }
 
@@ -195,27 +241,29 @@ export function groupFills(rawFills: RawFill[], tz: string): RoundTrip[] {
       // opens a new one in the opposite direction. Fees pro-rata.
       const closeSz = Math.abs(startPos)
       const openSz = Math.abs(endPos)
-      t.exitNotional += px * closeSz
-      t.exitSize += closeSz
-      t.pnl += pnl
-      t.fee += fee * (closeSz / sz)
-      close(t)
-      open[f.coin] = {
+      const b = bucketFor(t, iso)
+      b.exitNotional += px * closeSz
+      b.exitSize += closeSz
+      b.pnl += pnl
+      b.fee += fee * (closeSz / sz)
+      if (b.firstCloseMs == null) b.firstCloseMs = f.time
+      emitSegments(t, false)
+      const next: OpenTrade = {
         coin: f.coin,
         dirLong: endPos > 0,
         firstMs: f.time,
         entryNotional: px * openSz,
         entrySize: openSz,
-        exitNotional: 0,
-        exitSize: 0,
-        pnl: 0,
-        fee: fee * (openSz / sz),
+        days: new Map(),
       }
+      bucketFor(next, iso).fee += fee * (openSz / sz)
+      open[f.coin] = next
       continue
     }
 
-    t.fee += fee
-    t.pnl += pnl
+    const b = bucketFor(t, iso)
+    b.fee += fee
+    b.pnl += pnl
     if (increasing) {
       t.entryNotional += px * sz
       t.entrySize += sz
@@ -224,17 +272,19 @@ export function groupFills(rawFills: RawFill[], tz: string): RoundTrip[] {
         t.firstMs = f.time
       }
     } else {
-      t.exitNotional += px * sz
-      t.exitSize += sz
+      b.exitNotional += px * sz
+      b.exitSize += sz
+      if (b.firstCloseMs == null) b.firstCloseMs = f.time
     }
 
     if (Math.abs(endPos) < eps) {
-      close(t)
+      emitSegments(t, false)
       delete open[f.coin]
     }
   }
-  // Trades still open (position not back to flat) are intentionally dropped —
-  // the journal shows realized round trips only.
+  // Positions still open at the end of the window: emit what they've
+  // realized so far (all partial) so day totals reconcile with fills.
+  for (const t of Object.values(open)) emitSegments(t, true)
   return trips
 }
 
@@ -296,11 +346,12 @@ export function buildMonth(
       session: t.session,
       asset: t.asset,
       dir: t.dir,
-      entry: round2(t.entry),
-      exit: round2(t.exit),
+      entry: t.entry, // full precision — the UI formats per magnitude
+      exit: t.exit,
       size: round4(t.size),
       pnl: round2(t.pnl),
       fee: round2(t.fee),
+      partial: t.partial,
       tp: t.tp,
       sl: t.sl,
     })
@@ -412,4 +463,28 @@ export async function fetchUserFills(wallet: string): Promise<RawFill[]> {
     startTime = batch[batch.length - 1].time
   }
   return all
+}
+
+interface SpotMeta {
+  tokens: { name: string; index: number }[]
+  universe: { name: string; tokens: [number, number] }[]
+}
+
+/**
+ * Map spot pair indices ("@162") to their base token name for display.
+ * Best-effort: returns an empty map on failure so fills still render as @N.
+ */
+export async function fetchSpotMeta(): Promise<Record<string, string>> {
+  try {
+    const meta = (await infoRequest({ type: 'spotMeta' })) as SpotMeta
+    const tokenByIdx = new Map(meta.tokens.map((t) => [t.index, t.name]))
+    const map: Record<string, string> = {}
+    for (const u of meta.universe) {
+      const base = tokenByIdx.get(u.tokens[0])
+      if (base) map[u.name] = base
+    }
+    return map
+  } catch {
+    return {}
+  }
 }

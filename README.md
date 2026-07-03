@@ -34,6 +34,11 @@ return no fills), or click **Try demo data** to explore with a sample dataset.
   bucketed into sessions (NY Open / London / Asia / NY PM) in
   `America/New_York`.
 
-Notes: the journal shows **realized round trips** (positions returned to flat);
-still-open positions are excluded. TP/SL display is supported by the UI but not
-populated from fills — wire resting trigger orders if you want it.
+Notes: realized P&L is booked on **the day it was realized** (the day of the
+closing fills), matching Hyperliquid's own attribution. A position scaled out
+over several days appears on each of those days as a `partial` segment; the
+segments sum to the trade's total. Still-open positions are excluded until
+they return to flat — hit Refresh after closing. P&L figures are price P&L
+from fills (`closedPnl`): fees are shown separately per trade and funding is
+not included. TP/SL display is supported by the UI but not populated from
+fills — wire resting trigger orders if you want it.

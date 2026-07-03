@@ -8,11 +8,22 @@ export function money(n: number): string {
   return (n < 0 ? '-$' : '+$') + body
 }
 
-/** Price with decimals scaled to magnitude (BTC 98,000 vs sub-cent alts). */
+/** Price at 3 decimal places; sub-0.1 prices keep 4 significant digits. */
 export function price(n: number): string {
   const abs = Math.abs(n)
-  const dp = abs >= 1000 ? 1 : abs >= 10 ? 2 : abs >= 0.1 ? 4 : 6
+  if (abs === 0) return '0'
+  if (abs >= 0.1) {
+    return n.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
+  }
+  const dp = Math.min(10, 3 - Math.floor(Math.log10(abs)))
   return n.toLocaleString('en-US', { maximumFractionDigits: dp })
+}
+
+/** Position size expressed in USDC notional, e.g. "$1,254,301". */
+export function usd(n: number): string {
+  const abs = Math.abs(n)
+  const dp = abs >= 100 ? 0 : 2
+  return '$' + abs.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
 }
 
 export function shortWallet(w: string): string {

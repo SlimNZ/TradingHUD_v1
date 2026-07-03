@@ -1,5 +1,5 @@
 import type { Day, Trade } from '../lib/hyperliquid'
-import { money, price } from '../lib/format'
+import { money, price, usd } from '../lib/format'
 
 function dateLong(iso: string): string {
   const d = new Date(iso + 'T12:00:00Z')
@@ -10,11 +10,19 @@ function dateLong(iso: string): string {
 
 function TradeCard({ t }: { t: Trade }) {
   const long = t.dir === 'LONG'
+  // USDC notional of the quantity closed, at the trade's avg entry (cost
+  // basis); falls back to exit when the entry predates the data window.
+  const notional = t.size * (t.entry || t.exit)
   return (
     <div className="trade">
       <div className="trow1">
         <span className={`tdir ${long ? 'long' : 'short'}`}>{t.dir}</span>
         <span className="tasset">{t.asset}</span>
+        {t.partial && (
+          <span className="tag" title="Scale-out: the position stayed open past this day">
+            partial
+          </span>
+        )}
         <span className="ttime">
           {t.time} ET
           <br />
@@ -31,8 +39,8 @@ function TradeCard({ t }: { t: Trade }) {
           <div className="vv">{price(t.exit)}</div>
         </div>
         <div className="tg">
-          <div className="kk">Size</div>
-          <div className="vv">{t.size}</div>
+          <div className="kk">Size (USDC)</div>
+          <div className="vv">{usd(notional)}</div>
         </div>
       </div>
       {t.tp != null && t.sl != null && (
@@ -47,7 +55,7 @@ function TradeCard({ t }: { t: Trade }) {
       )}
       <div className="tpnl">
         <span className="rr">
-          fee ${t.fee.toFixed(2)} · {t.size}
+          fee ${t.fee.toFixed(2)} · sz {t.size.toLocaleString('en-US')}
         </span>
         <span className={`amt ${t.pnl >= 0 ? 'grn' : 'red'}`}>{money(t.pnl)}</span>
       </div>

@@ -55,7 +55,7 @@ function TradeCard({ t }: { t: Trade }) {
       )}
       <div className="tpnl">
         <span className="rr">
-          fee ${t.fee.toFixed(2)} · sz {t.size.toLocaleString('en-US')}
+          {t.gross != null && <>gross {money(t.gross)} · </>}fee ${t.fee.toFixed(2)}
         </span>
         <span className={`amt ${t.pnl >= 0 ? 'grn' : 'red'}`}>{money(t.pnl)}</span>
       </div>

@@ -94,12 +94,16 @@ export function LeftStats({ journal, fillCount, syncedAt, refreshing, onChangeWa
         </div>
         <div className="stat-tile">
           <div className="klabel">Best day</div>
-          <div className="mono stat-val sm grn">{s.bestDay ? money(s.bestDay.pnl) : '—'}</div>
+          <div className={`mono stat-val sm ${!s.bestDay || s.bestDay.pnl >= 0 ? 'grn' : 'red'}`}>
+            {s.bestDay ? money(s.bestDay.pnl) : '—'}
+          </div>
           <div className="mono stat-sub">{s.bestDay?.date ?? ''}</div>
         </div>
         <div className="stat-tile">
           <div className="klabel">Worst day</div>
-          <div className="mono stat-val sm red">{s.worstDay ? money(s.worstDay.pnl) : '—'}</div>
+          <div className={`mono stat-val sm ${!s.worstDay || s.worstDay.pnl >= 0 ? 'grn' : 'red'}`}>
+            {s.worstDay ? money(s.worstDay.pnl) : '—'}
+          </div>
           <div className="mono stat-sub">{s.worstDay?.date ?? ''}</div>
         </div>
       </div>

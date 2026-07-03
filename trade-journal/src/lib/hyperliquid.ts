@@ -31,7 +31,8 @@ export interface Trade {
   entry: number
   exit: number
   size: number
-  pnl: number
+  pnl: number // net of fees (price P&L minus fee)
+  gross?: number // price P&L before fees (set by buildMonth; absent on raw RoundTrips)
   fee: number
   partial?: boolean // true = scale-out of a position that stayed open past this day
   tp: number | null // not present in fills; populate from trigger orders if fetched
@@ -336,9 +337,10 @@ export function buildMonth(
         sessions: {},
         trades_list: [],
       })
-    d.pnl += t.pnl
+    const net = t.pnl - t.fee // fees are baked into every total below
+    d.pnl += net
     d.trades += 1
-    if (t.pnl >= 0) d.wins += 1
+    if (net >= 0) d.wins += 1
     d.assets.add(t.asset)
     d.sessions[t.session] = (d.sessions[t.session] || 0) + 1
     d.trades_list.push({
@@ -349,7 +351,8 @@ export function buildMonth(
       entry: t.entry, // full precision — the UI formats per magnitude
       exit: t.exit,
       size: round4(t.size),
-      pnl: round2(t.pnl),
+      pnl: round2(net),
+      gross: round2(t.pnl),
       fee: round2(t.fee),
       partial: t.partial,
       tp: t.tp,

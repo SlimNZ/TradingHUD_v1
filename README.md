@@ -38,7 +38,14 @@ Notes: realized P&L is booked on **the day it was realized** (the day of the
 closing fills), matching Hyperliquid's own attribution. A position scaled out
 over several days appears on each of those days as a `partial` segment; the
 segments sum to the trade's total. Still-open positions are excluded until
-they return to flat — hit Refresh after closing. P&L figures are price P&L
-from fills (`closedPnl`): fees are shown separately per trade and funding is
-not included. TP/SL display is supported by the UI but not populated from
-fills — wire resting trigger orders if you want it.
+they return to flat — hit Refresh after closing. P&L figures are **net of
+fees**: every daily/weekly/monthly total, best/worst day, and the sparkline
+subtract trading fees, and each trade card shows its net P&L with the gross
+(pre-fee) price P&L and the fee beside it. Fees are attributed to a trade, so
+a fully-closed trade's fees always land with its realized P&L (verified: all
+fees on flat positions are counted, and cards sum to the day total exactly).
+A position still open at the end of the data defers its as-yet-unrealized
+opening fees until it closes — consistent with excluding unrealized P&L.
+Funding is still not included (it's not in the fills feed). TP/SL display is
+supported by the UI but not populated from fills — wire resting trigger
+orders if you want it.

@@ -210,3 +210,28 @@ button { font-family: inherit; }
 .tpnl { margin-top: 8px; display: flex; justify-content: space-between; align-items: center; }
 .tpnl .rr { font: 500 9px/1 'JetBrains Mono', monospace; color: #767b85; }
 .tpnl .amt { font: 700 12px/1 'JetBrains Mono', monospace; }
+
+/* notes */
+.tnote { margin-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px; }
+.note-input {
+  width: 100%; resize: vertical; min-height: 52px;
+  background: #0e1013; color: #dfe1e5;
+  border: 1px solid rgba(203, 178, 107, 0.35); border-radius: 6px;
+  padding: 7px 8px; font: 400 11px/1.45 system-ui; outline: none;
+}
+.note-input::placeholder { color: #5c616b; }
+.note-text {
+  white-space: pre-wrap; word-break: break-word; cursor: text;
+  background: rgba(203, 178, 107, 0.06);
+  border-left: 2px solid rgba(203, 178, 107, 0.45); border-radius: 4px;
+  padding: 6px 8px; font: 400 11px/1.45 system-ui; color: #c9ccd2;
+}
+.note-add {
+  background: none; border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 6px; padding: 5px 9px; cursor: pointer;
+  font: 500 10px/1 system-ui; color: #8b909a;
+}
+.note-add:hover { border-color: rgba(203, 178, 107, 0.5); color: #c9ccd2; }
+
+.day-note { margin-top: 12px; }
+.day-note-label { font: 600 8.5px/1 system-ui; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7079; margin-bottom: 6px; }

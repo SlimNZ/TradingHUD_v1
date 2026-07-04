@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from 'react'
 import type { Day, Trade } from '../lib/hyperliquid'
 import { money, price, usd } from '../lib/format'
+import { dayNoteKey, tradeNoteKey } from '../lib/notes'
+import type { NoteMap } from '../lib/notes'
 
 function dateLong(iso: string): string {
   const d = new Date(iso + 'T12:00:00Z')
@@ -8,7 +11,78 @@ function dateLong(iso: string): string {
   return `${dow} · ${md}`
 }
 
-function TradeCard({ t }: { t: Trade }) {
+/** Inline note editor: click to edit, auto-saves on blur, Esc cancels. */
+function NoteEditor({
+  value,
+  placeholder,
+  addLabel,
+  onSave,
+}: {
+  value: string | undefined
+  placeholder: string
+  addLabel: string
+  onSave: (text: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!editing) setDraft(value ?? '')
+  }, [value, editing])
+
+  useEffect(() => {
+    if (editing && ref.current) {
+      const el = ref.current
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    }
+  }, [editing])
+
+  if (editing) {
+    return (
+      <textarea
+        ref={ref}
+        className="note-input"
+        value={draft}
+        placeholder={placeholder}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          onSave(draft)
+          setEditing(false)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            setDraft(value ?? '')
+            setEditing(false)
+          }
+        }}
+      />
+    )
+  }
+  if (value) {
+    return (
+      <div className="note-text" onClick={() => setEditing(true)} title="Click to edit">
+        {value}
+      </div>
+    )
+  }
+  return (
+    <button className="note-add" onClick={() => setEditing(true)}>
+      {addLabel}
+    </button>
+  )
+}
+
+function TradeCard({
+  t,
+  note,
+  onSaveNote,
+}: {
+  t: Trade
+  note: string | undefined
+  onSaveNote: (text: string) => void
+}) {
   const long = t.dir === 'LONG'
   // USDC notional of the quantity closed, at the trade's avg entry (cost
   // basis); falls back to exit when the entry predates the data window.
@@ -59,11 +133,29 @@ function TradeCard({ t }: { t: Trade }) {
         </span>
         <span className={`amt ${t.pnl >= 0 ? 'grn' : 'red'}`}>{money(t.pnl)}</span>
       </div>
+      <div className="tnote">
+        <NoteEditor
+          value={note}
+          onSave={onSaveNote}
+          addLabel="＋ Add note"
+          placeholder="Setup & trigger · execution · mistake · lesson…"
+        />
+      </div>
     </div>
   )
 }
 
-export function DetailPanel({ day, onClose }: { day: Day; onClose: () => void }) {
+export function DetailPanel({
+  day,
+  notes,
+  onSaveNote,
+  onClose,
+}: {
+  day: Day
+  notes: NoteMap
+  onSaveNote: (key: string, text: string) => void
+  onClose: () => void
+}) {
   const wins = day.trades_list.filter((t) => t.pnl >= 0).length
   const losses = day.trades - wins
   return (
@@ -88,11 +180,25 @@ export function DetailPanel({ day, onClose }: { day: Day; onClose: () => void })
             <span className={day.funding >= 0 ? 'grn' : 'red'}>{money(day.funding)}</span>
           </div>
         )}
+        <div className="day-note">
+          <div className="day-note-label">Daily review</div>
+          <NoteEditor
+            value={notes[dayNoteKey(day.date)]}
+            onSave={(text) => onSaveNote(dayNoteKey(day.date), text)}
+            addLabel="＋ Add daily review"
+            placeholder="Market context · what I did well · what to improve · rules followed/broken · plan for tomorrow…"
+          />
+        </div>
       </div>
       {day.trades_list.length ? (
         <div className="panel-list">
           {day.trades_list.map((t, i) => (
-            <TradeCard t={t} key={i} />
+            <TradeCard
+              t={t}
+              key={i}
+              note={notes[tradeNoteKey(day.date, t)]}
+              onSaveNote={(text) => onSaveNote(tradeNoteKey(day.date, t), text)}
+            />
           ))}
         </div>
       ) : (

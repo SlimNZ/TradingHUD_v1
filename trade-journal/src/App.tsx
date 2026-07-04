@@ -10,6 +10,8 @@ import {
   groupFills,
 } from './lib/hyperliquid'
 import type { FundingEntry, RoundTrip } from './lib/hyperliquid'
+import { loadNotes, persistNotes } from './lib/notes'
+import type { NoteMap } from './lib/notes'
 import { DEMO_FILL_COUNT, DEMO_WALLET, demoTags, demoTrips } from './lib/demo'
 import { ConnectGate } from './components/ConnectGate'
 import { LeftStats } from './components/LeftStats'
@@ -39,6 +41,7 @@ interface Session {
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
+  const [notes, setNotes] = useState<NoteMap>({})
   const [monthKey, setMonthKey] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
@@ -82,6 +85,7 @@ export default function App() {
     try {
       const s = await loadWallet(wallet)
       setSession(s)
+      setNotes(loadNotes(s.wallet))
       const months = availableMonths(s.trips, s.funding, TZ)
       setMonthKey(months[months.length - 1])
       setSelected(null)
@@ -104,8 +108,20 @@ export default function App() {
       isDemo: true,
       tags: demoTags(),
     })
+    setNotes(loadNotes(DEMO_WALLET))
     setMonthKey('2026-02')
     setSelected(null)
+  }
+
+  const saveNote = (key: string, text: string) => {
+    if (!session) return
+    setNotes((prev) => {
+      const next = { ...prev }
+      if (text.trim()) next[key] = text
+      else delete next[key]
+      persistNotes(session.wallet, next)
+      return next
+    })
   }
 
   const refresh = async () => {
@@ -189,7 +205,14 @@ export default function App() {
         canPrev={canPrev}
         canNext={canNext}
       />
-      {selectedDay && <DetailPanel day={selectedDay} onClose={() => setSelected(null)} />}
+      {selectedDay && (
+        <DetailPanel
+          day={selectedDay}
+          notes={notes}
+          onSaveNote={saveNote}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

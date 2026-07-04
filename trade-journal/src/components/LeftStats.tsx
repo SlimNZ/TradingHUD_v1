@@ -81,6 +81,11 @@ export function LeftStats({ journal, fillCount, syncedAt, refreshing, onChangeWa
           Net P&L · Month
         </div>
         <div className={`mono netpnl ${s.netPnl >= 0 ? 'grn' : 'red'}`}>{money(s.netPnl)}</div>
+        <div className="mono netpnl-breakdown">
+          <span>trades {money(s.tradePnl)}</span>
+          <span className="sep">·</span>
+          <span>funding {money(s.funding)}</span>
+        </div>
       </div>
 
       <div className="stat-grid">

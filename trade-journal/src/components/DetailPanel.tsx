@@ -82,6 +82,12 @@ export function DetailPanel({ day, onClose }: { day: Day; onClose: () => void })
         <div className="panel-meta">
           {day.trades} trades · {day.winRate}% win · {wins}W / {losses}L
         </div>
+        {Math.abs(day.funding) >= 0.01 && (
+          <div className="panel-meta">
+            trades {money(day.tradePnl)} · funding{' '}
+            <span className={day.funding >= 0 ? 'grn' : 'red'}>{money(day.funding)}</span>
+          </div>
+        )}
       </div>
       {day.trades_list.length ? (
         <div className="panel-list">
@@ -91,11 +97,21 @@ export function DetailPanel({ day, onClose }: { day: Day; onClose: () => void })
         </div>
       ) : (
         <div className="panel-empty">
-          <div className="t1">No trades logged</div>
+          <div className="t1">{Math.abs(day.funding) >= 0.01 ? 'Funding only' : 'No trades logged'}</div>
           <div className="t2">
-            Nothing synced for this day.
-            <br />
-            Pick a colored day to see fills.
+            {Math.abs(day.funding) >= 0.01 ? (
+              <>
+                No trades closed this day.
+                <br />
+                Funding {money(day.funding)} on open positions.
+              </>
+            ) : (
+              <>
+                Nothing synced for this day.
+                <br />
+                Pick a colored day to see fills.
+              </>
+            )}
           </div>
         </div>
       )}

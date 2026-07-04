@@ -54,7 +54,9 @@ export interface RoundTrip extends Trade {
 export interface Day {
   date: string
   dayNum: number
-  pnl: number
+  pnl: number // net trade P&L (of fees) + funding for the day
+  tradePnl: number // net trade P&L only (of fees), excluding funding
+  funding: number // funding paid(-)/received(+) that day
   trades: number
   winRate: number
   assets: string[]
@@ -69,7 +71,9 @@ export interface JournalMonth {
   monthKey: string // "2026-02"
   timezone: string
   summary: {
-    netPnl: number
+    netPnl: number // total incl funding
+    tradePnl: number // net trade P&L only (of fees), excluding funding
+    funding: number // total funding paid(-)/received(+) for the month
     trades: number
     winRate: number
     bestDay: { date: string; pnl: number } | null
@@ -77,6 +81,13 @@ export interface JournalMonth {
     cumulative: number[]
   }
   days: Day[]
+}
+
+/** Funding payment bucketed by calendar day (in the journal tz). */
+export interface FundingEntry {
+  time: number // ms
+  coin: string
+  usdc: number // payment: negative = paid, positive = received
 }
 
 // ---- Session bucketing (windows in target tz, minutes-from-midnight) ------
@@ -289,15 +300,28 @@ export function groupFills(
   return trips
 }
 
-/** Sorted list of "YYYY-MM" keys that contain at least one trade. */
-export function availableMonths(trips: RoundTrip[]): string[] {
-  return [...new Set(trips.map((t) => t.monthKey))].sort()
+/** Sorted list of "YYYY-MM" keys that contain a trade or any funding. */
+export function availableMonths(trips: RoundTrip[], funding: FundingEntry[] = [], tz = 'America/New_York'): string[] {
+  const keys = new Set(trips.map((t) => t.monthKey))
+  for (const f of funding) keys.add(tzParts(f.time, tz).iso.slice(0, 7))
+  return [...keys].sort()
+}
+
+/** Sum funding payments per calendar day (iso date in the journal tz). */
+export function fundingByDay(funding: FundingEntry[], tz: string): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const f of funding) {
+    const iso = tzParts(f.time, tz).iso
+    map[iso] = (map[iso] || 0) + f.usdc
+  }
+  return map
 }
 
 export interface BuildMonthOpts {
   wallet?: string | null
   timezone?: string
   tags?: Record<string, string> // iso date -> label, e.g. from user storage
+  funding?: Record<string, number> // iso date -> net funding that day (from fundingByDay)
 }
 
 /** Roll round-trip trades up into the JournalMonth payload the UI consumes. */
@@ -316,7 +340,7 @@ export function buildMonth(
     {
       date: string
       dayNum: number
-      pnl: number
+      tradePnl: number
       wins: number
       trades: number
       assets: Set<string>
@@ -324,21 +348,23 @@ export function buildMonth(
       trades_list: Trade[]
     }
   > = {}
+  const dayOf = (iso: string) =>
+    byDay[iso] ||
+    (byDay[iso] = {
+      date: iso,
+      dayNum: parseInt(iso.slice(8), 10),
+      tradePnl: 0,
+      wins: 0,
+      trades: 0,
+      assets: new Set(),
+      sessions: {},
+      trades_list: [],
+    })
+
   for (const t of trips) {
-    const d =
-      byDay[t.iso] ||
-      (byDay[t.iso] = {
-        date: t.iso,
-        dayNum: t.dayNum,
-        pnl: 0,
-        wins: 0,
-        trades: 0,
-        assets: new Set(),
-        sessions: {},
-        trades_list: [],
-      })
-    const net = t.pnl - t.fee // fees are baked into every total below
-    d.pnl += net
+    const d = dayOf(t.iso)
+    const net = t.pnl - t.fee // fees are baked into every trade total
+    d.tradePnl += net
     d.trades += 1
     if (net >= 0) d.wins += 1
     d.assets.add(t.asset)
@@ -360,21 +386,41 @@ export function buildMonth(
     })
   }
 
+  // Funding for this month — creates a day entry even with no trades so it
+  // reconciles into the totals (funding accrues while positions are open).
+  const funding = opts.funding ?? {}
+  const fundByIso: Record<string, number> = {}
+  for (const [iso, amt] of Object.entries(funding)) {
+    if (iso.slice(0, 7) !== monthKey) continue
+    fundByIso[iso] = amt
+    if (Math.abs(amt) > 1e-9) dayOf(iso) // materialize funding-only days
+  }
+
   const days: Day[] = Object.values(byDay)
     .sort((a, b) => a.date.localeCompare(b.date))
-    .map((d) => ({
-      date: d.date,
-      dayNum: d.dayNum,
-      pnl: round2(d.pnl),
-      trades: d.trades,
-      winRate: Math.round((d.wins / d.trades) * 100),
-      assets: [...d.assets],
-      tag: opts.tags?.[d.date] ?? null,
-      session: Object.entries(d.sessions).sort((a, b) => b[1] - a[1])[0][0],
-      trades_list: d.trades_list,
-    }))
+    .map((d) => {
+      const fund = round2(fundByIso[d.date] || 0)
+      const tradePnl = round2(d.tradePnl)
+      return {
+        date: d.date,
+        dayNum: d.dayNum,
+        pnl: round2(tradePnl + fund),
+        tradePnl,
+        funding: fund,
+        trades: d.trades,
+        winRate: d.trades ? Math.round((d.wins / d.trades) * 100) : 0,
+        assets: [...d.assets],
+        tag: opts.tags?.[d.date] ?? null,
+        session: d.trades
+          ? Object.entries(d.sessions).sort((a, b) => b[1] - a[1])[0][0]
+          : 'Funding',
+        trades_list: d.trades_list,
+      }
+    })
 
   let net = 0
+  let tradeNet = 0
+  let fundNet = 0
   let tCount = 0
   let wins = 0
   let best: Day | null = null
@@ -382,6 +428,8 @@ export function buildMonth(
   const cumulative: number[] = []
   for (const d of days) {
     net += d.pnl
+    tradeNet += d.tradePnl
+    fundNet += d.funding
     tCount += d.trades
     wins += d.trades_list.filter((t) => t.pnl >= 0).length
     cumulative.push(round2(net))
@@ -407,6 +455,8 @@ export function buildMonth(
     timezone: tz,
     summary: {
       netPnl: round2(net),
+      tradePnl: round2(tradeNet),
+      funding: round2(fundNet),
       trades: tCount,
       winRate: tCount ? Math.round((wins / tCount) * 100) : 0,
       bestDay: best ? { date: shortDate(best.date), pnl: best.pnl } : null,
@@ -463,6 +513,38 @@ export async function fetchUserFills(wallet: string): Promise<RawFill[]> {
     }
     if (batch.length < PAGE_SIZE) break
     // restart from the last fill's timestamp; tid dedupe handles the overlap
+    startTime = batch[batch.length - 1].time
+  }
+  return all
+}
+
+interface FundingRow {
+  time: number
+  hash: string
+  delta: { type: string; coin: string; usdc: string; szi: string; fundingRate: string }
+}
+
+/**
+ * Fetch all funding payments for a wallet by paging userFunding forward.
+ * Returns entries with usdc = payment (negative = paid, positive = received).
+ * Funding is not in the fills feed; the journal folds these into P&L.
+ */
+export async function fetchUserFunding(wallet: string): Promise<FundingEntry[]> {
+  const FUND_PAGE = 500 // this endpoint caps at 500 rows/response
+  const seen = new Set<string>()
+  const all: FundingEntry[] = []
+  let startTime = 0
+  // Funding accrues hourly; allow generous paging for multi-year histories.
+  for (let page = 0; page < 60; page++) {
+    const batch = (await infoRequest({ type: 'userFunding', user: wallet, startTime })) as FundingRow[]
+    if (!Array.isArray(batch)) throw new Error('Unexpected funding response from Hyperliquid')
+    for (const r of batch) {
+      const key = `${r.time}|${r.delta.coin}|${r.delta.usdc}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      all.push({ time: r.time, coin: r.delta.coin, usdc: parseFloat(r.delta.usdc || '0') })
+    }
+    if (batch.length < FUND_PAGE) break
     startTime = batch[batch.length - 1].time
   }
   return all

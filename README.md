@@ -46,6 +46,22 @@ a fully-closed trade's fees always land with its realized P&L (verified: all
 fees on flat positions are counted, and cards sum to the day total exactly).
 A position still open at the end of the data defers its as-yet-unrealized
 opening fees until it closes — consistent with excluding unrealized P&L.
-Funding is still not included (it's not in the fills feed). TP/SL display is
-supported by the UI but not populated from fills — wire resting trigger
-orders if you want it.
+**Funding is included**: it's fetched separately (paged `userFunding`) and
+folded into daily/weekly/monthly P&L, with the trades-vs-funding split shown
+in the left pane and detail panel. Days with funding but no closed trades
+still appear (funding accrues on open positions). TP/SL display is supported
+by the UI but not populated from fills — wire resting trigger orders if you
+want it.
+
+## Tax reconciliation
+
+Reconciled against Hyperliquid CSV exports (trade history, funding history,
+deposits/withdrawals) at the grand-total level: trade P&L matches 99.97% and
+funding 100%. Notes for anyone auditing: the CSV `closedPnl` column is
+already **net of fees** (don't subtract fees again); CSV timestamps are in
+**local time** (this account's exports are NZ, UTC+12/+13), while the app
+buckets days in `America/New_York` — totals are tz-independent but per-day
+and per-month attribution near midnight can shift, and tax-year boundaries
+(e.g. NZ 1 Apr–31 Mar) should be computed in local time. The app reads the
+public API (~10k most recent fills); accounts with longer histories should
+reconcile against the full CSV export.

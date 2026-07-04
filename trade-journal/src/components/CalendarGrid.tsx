@@ -39,7 +39,7 @@ function DayCell({ slot, selected, onSelect }: { slot: Slot; selected: boolean; 
       <div className="dnum">{d.dayNum}</div>
       <div className="cpnl">{money(d.pnl)}</div>
       <div className="cmeta">
-        {d.trades} trades · {d.winRate}%
+        {d.trades ? `${d.trades} trades · ${d.winRate}%` : 'funding only'}
       </div>
       <div className="chips">
         {d.assets.map((a) => (

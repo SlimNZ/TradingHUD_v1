@@ -1,6 +1,14 @@
 import { useMemo, useState } from 'react'
-import { availableMonths, buildMonth, fetchSpotMeta, fetchUserFills, groupFills } from './lib/hyperliquid'
-import type { RoundTrip } from './lib/hyperliquid'
+import {
+  availableMonths,
+  buildMonth,
+  fetchSpotMeta,
+  fetchUserFills,
+  fetchUserFunding,
+  fundingByDay,
+  groupFills,
+} from './lib/hyperliquid'
+import type { FundingEntry, RoundTrip } from './lib/hyperliquid'
 import { DEMO_FILL_COUNT, DEMO_WALLET, demoTags, demoTrips } from './lib/demo'
 import { ConnectGate } from './components/ConnectGate'
 import { LeftStats } from './components/LeftStats'
@@ -18,6 +26,8 @@ const stepMonth = (key: string, delta: number): string => {
 interface Session {
   wallet: string
   trips: RoundTrip[]
+  funding: FundingEntry[]
+  fundByDay: Record<string, number>
   fillCount: number
   syncedAt: number
   isDemo: boolean
@@ -37,7 +47,11 @@ export default function App() {
     if (!/^0x[0-9a-fA-F]{40}$/.test(w)) {
       throw new Error('That does not look like a wallet address (expected 0x + 40 hex characters).')
     }
-    const [fills, spotNames] = await Promise.all([fetchUserFills(w), fetchSpotMeta()])
+    const [fills, spotNames, funding] = await Promise.all([
+      fetchUserFills(w),
+      fetchSpotMeta(),
+      fetchUserFunding(w),
+    ])
     if (!fills.length) {
       throw new Error(
         'No fills found for this address. Make sure it is your MAIN account address — agent/API wallets return empty results.',
@@ -47,7 +61,16 @@ export default function App() {
     if (!trips.length) {
       throw new Error('Fills were found, but no completed round-trip trades yet.')
     }
-    return { wallet: w, trips, fillCount: fills.length, syncedAt: Date.now(), isDemo: false, tags: {} }
+    return {
+      wallet: w,
+      trips,
+      funding,
+      fundByDay: fundingByDay(funding, TZ),
+      fillCount: fills.length,
+      syncedAt: Date.now(),
+      isDemo: false,
+      tags: {},
+    }
   }
 
   const connect = async (wallet: string) => {
@@ -56,7 +79,7 @@ export default function App() {
     try {
       const s = await loadWallet(wallet)
       setSession(s)
-      const months = availableMonths(s.trips)
+      const months = availableMonths(s.trips, s.funding, TZ)
       setMonthKey(months[months.length - 1])
       setSelected(null)
     } catch (e) {
@@ -71,6 +94,8 @@ export default function App() {
     setSession({
       wallet: DEMO_WALLET,
       trips: demoTrips(),
+      funding: [],
+      fundByDay: {},
       fillCount: DEMO_FILL_COUNT,
       syncedAt: Date.now(),
       isDemo: true,
@@ -86,8 +111,8 @@ export default function App() {
     try {
       const s = await loadWallet(session.wallet)
       setSession(s)
-      // keep the current month if it still has trades, else jump to latest
-      const months = availableMonths(s.trips)
+      // keep the current month if it still has activity, else jump to latest
+      const months = availableMonths(s.trips, s.funding, TZ)
       if (!months.includes(monthKey)) setMonthKey(months[months.length - 1])
     } catch {
       // keep showing the last good data on a failed refresh
@@ -105,12 +130,20 @@ export default function App() {
   const journal = useMemo(
     () =>
       session && monthKey
-        ? buildMonth(session.trips, monthKey, { wallet: session.wallet, timezone: TZ, tags: session.tags })
+        ? buildMonth(session.trips, monthKey, {
+            wallet: session.wallet,
+            timezone: TZ,
+            tags: session.tags,
+            funding: session.fundByDay,
+          })
         : null,
     [session, monthKey],
   )
 
-  const months = useMemo(() => (session ? availableMonths(session.trips) : []), [session])
+  const months = useMemo(
+    () => (session ? availableMonths(session.trips, session.funding, TZ) : []),
+    [session],
+  )
   const canPrev = months.length > 0 && monthKey > months[0]
   const canNext = months.length > 0 && monthKey < months[months.length - 1]
 

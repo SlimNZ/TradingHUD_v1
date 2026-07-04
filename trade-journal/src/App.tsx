@@ -10,8 +10,9 @@ import {
   groupFills,
 } from './lib/hyperliquid'
 import type { FundingEntry, RoundTrip } from './lib/hyperliquid'
-import { loadNotes, persistNotes } from './lib/notes'
-import type { NoteMap } from './lib/notes'
+import { loadMeta, loadNotes, persistMeta, persistNotes } from './lib/notes'
+import type { MetaMap, NoteMap, TradeMeta } from './lib/notes'
+import { StatsPanel } from './components/StatsPanel'
 import { DEMO_FILL_COUNT, DEMO_WALLET, demoTags, demoTrips } from './lib/demo'
 import { ConnectGate } from './components/ConnectGate'
 import { LeftStats } from './components/LeftStats'
@@ -42,8 +43,10 @@ interface Session {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [notes, setNotes] = useState<NoteMap>({})
+  const [meta, setMeta] = useState<MetaMap>({})
   const [monthKey, setMonthKey] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
+  const [showStats, setShowStats] = useState(false)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +89,7 @@ export default function App() {
       const s = await loadWallet(wallet)
       setSession(s)
       setNotes(loadNotes(s.wallet))
+      setMeta(loadMeta(s.wallet))
       const months = availableMonths(s.trips, s.funding, TZ)
       setMonthKey(months[months.length - 1])
       setSelected(null)
@@ -109,6 +113,7 @@ export default function App() {
       tags: demoTags(),
     })
     setNotes(loadNotes(DEMO_WALLET))
+    setMeta(loadMeta(DEMO_WALLET))
     setMonthKey('2026-02')
     setSelected(null)
   }
@@ -120,6 +125,23 @@ export default function App() {
       if (text.trim()) next[key] = text
       else delete next[key]
       persistNotes(session.wallet, next)
+      return next
+    })
+  }
+
+  const saveMeta = (key: string, patch: Partial<TradeMeta>) => {
+    if (!session) return
+    setMeta((prev) => {
+      const merged = { ...prev[key], ...patch }
+      // drop empty fields so an all-empty entry doesn't linger
+      const cleaned: TradeMeta = {}
+      if (merged.grade) cleaned.grade = merged.grade
+      if (merged.followedPlan !== undefined) cleaned.followedPlan = merged.followedPlan
+      if (merged.setup && merged.setup.trim()) cleaned.setup = merged.setup.trim()
+      const next = { ...prev }
+      if (Object.keys(cleaned).length) next[key] = cleaned
+      else delete next[key]
+      persistMeta(session.wallet, next)
       return next
     })
   }
@@ -204,14 +226,20 @@ export default function App() {
         onNextMonth={() => goMonth(1)}
         canPrev={canPrev}
         canNext={canNext}
+        onOpenStats={() => setShowStats(true)}
       />
       {selectedDay && (
         <DetailPanel
           day={selectedDay}
           notes={notes}
+          meta={meta}
           onSaveNote={saveNote}
+          onSaveMeta={saveMeta}
           onClose={() => setSelected(null)}
         />
+      )}
+      {showStats && (
+        <StatsPanel trips={session.trips} meta={meta} onClose={() => setShowStats(false)} />
       )}
     </div>
   )

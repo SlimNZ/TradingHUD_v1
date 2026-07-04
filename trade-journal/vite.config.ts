@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react'
 // if that ever gets blocked, front it with a tiny proxy on the same path.
 export default defineConfig({
   plugins: [react()],
+  // Relative asset paths so the built site works at any URL — GitHub Pages
+  // project subpath (…/TradingHUD_v1/), a custom domain, or opened locally.
+  base: './',
   server: {
     proxy: {
       '/hl-api': {

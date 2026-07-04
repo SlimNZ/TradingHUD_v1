@@ -81,9 +81,19 @@ interface Props {
   onNextMonth: () => void
   canPrev: boolean
   canNext: boolean
+  onOpenStats: () => void
 }
 
-export function CalendarGrid({ journal, selected, onSelect, onPrevMonth, onNextMonth, canPrev, canNext }: Props) {
+export function CalendarGrid({
+  journal,
+  selected,
+  onSelect,
+  onPrevMonth,
+  onNextMonth,
+  canPrev,
+  canNext,
+  onOpenStats,
+}: Props) {
   const weeks = useMemo(() => buildWeeks(journal.monthKey, journal.days), [journal])
   return (
     <main className="center">
@@ -97,6 +107,9 @@ export function CalendarGrid({ journal, selected, onSelect, onPrevMonth, onNextM
             ›
           </button>
         </div>
+        <button className="stats-btn" onClick={onOpenStats}>
+          📊 Stats
+        </button>
         <div className="cal-legend">
           <span className="item">
             <span className="sw" style={{ background: 'rgba(34,197,94,.5)' }} />

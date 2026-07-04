@@ -235,3 +235,62 @@ button { font-family: inherit; }
 
 .day-note { margin-top: 12px; }
 .day-note-label { font: 600 8.5px/1 system-ui; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7079; margin-bottom: 6px; }
+
+/* per-trade structured meta */
+.tmeta { margin-top: 9px; display: flex; flex-direction: column; gap: 7px; }
+.grade-row { display: flex; align-items: center; gap: 6px; }
+.tmeta-label { font: 600 8px/1 system-ui; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7079; }
+.grade-pill {
+  width: 22px; height: 20px; cursor: pointer;
+  background: #0e1013; color: #9aa0aa;
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 5px;
+  font: 700 10px/1 system-ui;
+}
+.grade-pill.on { color: #141518; border-color: transparent; }
+.grade-pill.on.gA { background: #34d399; }
+.grade-pill.on.gB { background: #cbb26b; }
+.grade-pill.on.gC { background: #f0a34a; }
+.plan-check { margin-left: auto; display: flex; align-items: center; gap: 5px; font: 500 10px/1 system-ui; color: #c2c6cd; cursor: pointer; }
+.plan-check input { accent-color: #34d399; cursor: pointer; }
+.setup-input {
+  width: 100%; background: #0e1013; color: #dfe1e5;
+  border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+  padding: 6px 8px; font: 500 10.5px/1 'JetBrains Mono', monospace; outline: none;
+}
+.setup-input:focus { border-color: rgba(203, 178, 107, 0.45); }
+.setup-input::placeholder { color: #5c616b; }
+
+/* stats button + modal */
+.stats-btn {
+  margin-left: 14px; cursor: pointer;
+  background: none; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 7px;
+  padding: 6px 10px; font: 600 11px/1 system-ui; color: #c9ccd2;
+}
+.stats-btn:hover { border-color: rgba(203, 178, 107, 0.5); }
+.stats-overlay {
+  position: fixed; inset: 0; z-index: 20;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.stats-modal {
+  width: 560px; max-width: 100%; max-height: 86vh; overflow: auto;
+  background: #101114; border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px; padding: 20px 22px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.stats-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+.stats-title { font: 700 17px/1 system-ui; }
+.stats-sub { font: 500 10.5px/1 'JetBrains Mono', monospace; color: #767b85; margin-top: 6px; }
+.stats-adherence { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 9px; padding: 12px 14px; background: #16181c; margin-bottom: 16px; }
+.adherence-val { font: 700 22px/1 system-ui; margin-top: 6px; }
+.adherence-sub { font: 500 11px/1 system-ui; color: #8b909a; }
+.adherence-split { display: flex; gap: 8px; margin-top: 8px; font-size: 11px; color: #9aa0aa; }
+.adherence-split .sep { color: #4a4e56; }
+.stats-block { margin-bottom: 16px; }
+.stats-block-title { font: 600 8.5px/1 system-ui; letter-spacing: 0.1em; text-transform: uppercase; color: #6b7079; margin-bottom: 8px; }
+.stats-table { width: 100%; border-collapse: collapse; font: 500 11.5px/1 system-ui; }
+.stats-table th { text-align: right; font: 600 9px/1 system-ui; letter-spacing: 0.04em; text-transform: uppercase; color: #6b7079; padding: 0 0 6px; }
+.stats-table th:first-child, .stats-table td.lbl { text-align: left; }
+.stats-table td { text-align: right; padding: 5px 0; border-top: 1px solid rgba(255, 255, 255, 0.06); font-family: 'JetBrains Mono', monospace; }
+.stats-table td.lbl { font-family: system-ui; color: #dfe1e5; }
+.stats-empty { font: 500 11px/1.4 system-ui; color: #767b85; }
+.stats-foot { font: 500 10px/1.5 system-ui; color: #6b7079; margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 12px; }

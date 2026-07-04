@@ -4,8 +4,29 @@
 import type { Trade } from './hyperliquid'
 
 const storeKey = (wallet: string) => `tj:notes:${wallet.toLowerCase()}`
+const metaStoreKey = (wallet: string) => `tj:meta:${wallet.toLowerCase()}`
 
 export type NoteMap = Record<string, string>
+
+/** Structured per-trade review fields (all optional). */
+export type Grade = 'A' | 'B' | 'C'
+export interface TradeMeta {
+  grade?: Grade
+  followedPlan?: boolean
+  setup?: string
+}
+export type MetaMap = Record<string, TradeMeta>
+
+/** Common setup labels offered as suggestions (free text still allowed). */
+export const SETUP_SUGGESTIONS = [
+  'breakout',
+  'reversal',
+  'trend pullback',
+  'range',
+  'scalp',
+  'news',
+  'A+ setup',
+]
 
 export function loadNotes(wallet: string): NoteMap {
   try {
@@ -20,6 +41,22 @@ export function persistNotes(wallet: string, notes: NoteMap): void {
     localStorage.setItem(storeKey(wallet), JSON.stringify(notes))
   } catch {
     // storage full / disabled — notes stay in-memory for the session
+  }
+}
+
+export function loadMeta(wallet: string): MetaMap {
+  try {
+    return JSON.parse(localStorage.getItem(metaStoreKey(wallet)) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+export function persistMeta(wallet: string, meta: MetaMap): void {
+  try {
+    localStorage.setItem(metaStoreKey(wallet), JSON.stringify(meta))
+  } catch {
+    // storage full / disabled — meta stays in-memory for the session
   }
 }
 

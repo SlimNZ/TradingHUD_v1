@@ -1,8 +1,52 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Day, Trade } from '../lib/hyperliquid'
 import { money, price, usd } from '../lib/format'
-import { dayNoteKey, tradeNoteKey } from '../lib/notes'
-import type { NoteMap } from '../lib/notes'
+import { dayNoteKey, tradeNoteKey, SETUP_SUGGESTIONS } from '../lib/notes'
+import type { Grade, MetaMap, NoteMap, TradeMeta } from '../lib/notes'
+
+const GRADES: Grade[] = ['A', 'B', 'C']
+
+function TradeMetaControls({
+  meta,
+  onSave,
+}: {
+  meta: TradeMeta | undefined
+  onSave: (patch: Partial<TradeMeta>) => void
+}) {
+  return (
+    <div className="tmeta">
+      <div className="grade-row">
+        <span className="tmeta-label">Grade</span>
+        {GRADES.map((g) => (
+          <button
+            key={g}
+            className={`grade-pill ${meta?.grade === g ? 'on g' + g : ''}`}
+            onClick={() => onSave({ grade: meta?.grade === g ? undefined : g })}
+          >
+            {g}
+          </button>
+        ))}
+        <label className="plan-check">
+          <input
+            type="checkbox"
+            checked={!!meta?.followedPlan}
+            onChange={(e) => onSave({ followedPlan: e.target.checked })}
+          />
+          Followed plan
+        </label>
+      </div>
+      <input
+        className="setup-input"
+        list="tj-setups"
+        placeholder="setup (e.g. breakout)"
+        defaultValue={meta?.setup ?? ''}
+        onBlur={(e) => {
+          if ((e.target.value.trim() || '') !== (meta?.setup ?? '')) onSave({ setup: e.target.value })
+        }}
+      />
+    </div>
+  )
+}
 
 function dateLong(iso: string): string {
   const d = new Date(iso + 'T12:00:00Z')
@@ -77,11 +121,15 @@ function NoteEditor({
 function TradeCard({
   t,
   note,
+  meta,
   onSaveNote,
+  onSaveMeta,
 }: {
   t: Trade
   note: string | undefined
+  meta: TradeMeta | undefined
   onSaveNote: (text: string) => void
+  onSaveMeta: (patch: Partial<TradeMeta>) => void
 }) {
   const long = t.dir === 'LONG'
   // USDC notional of the quantity closed, at the trade's avg entry (cost
@@ -133,6 +181,7 @@ function TradeCard({
         </span>
         <span className={`amt ${t.pnl >= 0 ? 'grn' : 'red'}`}>{money(t.pnl)}</span>
       </div>
+      <TradeMetaControls meta={meta} onSave={onSaveMeta} />
       <div className="tnote">
         <NoteEditor
           value={note}
@@ -148,18 +197,27 @@ function TradeCard({
 export function DetailPanel({
   day,
   notes,
+  meta,
   onSaveNote,
+  onSaveMeta,
   onClose,
 }: {
   day: Day
   notes: NoteMap
+  meta: MetaMap
   onSaveNote: (key: string, text: string) => void
+  onSaveMeta: (key: string, patch: Partial<TradeMeta>) => void
   onClose: () => void
 }) {
   const wins = day.trades_list.filter((t) => t.pnl >= 0).length
   const losses = day.trades - wins
   return (
     <aside className="panel">
+      <datalist id="tj-setups">
+        {SETUP_SUGGESTIONS.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
       <div className="panel-head">
         <div className="panel-head-row">
           <div className="panel-date">{dateLong(day.date)}</div>
@@ -197,7 +255,9 @@ export function DetailPanel({
               t={t}
               key={i}
               note={notes[tradeNoteKey(day.date, t)]}
+              meta={meta[tradeNoteKey(day.date, t)]}
               onSaveNote={(text) => onSaveNote(tradeNoteKey(day.date, t), text)}
+              onSaveMeta={(patch) => onSaveMeta(tradeNoteKey(day.date, t), patch)}
             />
           ))}
         </div>

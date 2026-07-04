@@ -18,6 +18,30 @@ npm run dev     # open the printed localhost URL (default http://localhost:5173)
 Paste your Hyperliquid **main account address** (not an agent/API wallet — those
 return no fills), or click **Try demo data** to explore with a sample dataset.
 
+## Journaling
+
+Click a day, then any trade card, to add:
+- A free-text **note** per trade and a **daily review** note for the day.
+- A **grade** (A/B/C), a **followed plan** toggle, and a **setup** tag.
+
+The **📊 Stats** button (calendar header) summarizes all reviewed trades:
+rule-adherence rate, and win rate + expectancy (avg net P&L per trade) broken
+down by setup, session, and grade. Notes and grades are stored in the browser's
+localStorage, keyed per wallet — they stay on your device and never leave it.
+
+## Hosting (free, static)
+
+The app is fully client-side and calls Hyperliquid's public API directly (it
+sends open CORS headers), so any static host works with no server.
+
+**GitHub Pages** (included): `.github/workflows/deploy.yml` builds and deploys on
+every push to `main`. One-time setup: repo **Settings → Pages → Source =
+GitHub Actions**. Vite `base: './'` makes assets resolve at the project subpath
+(`https://<user>.github.io/TradingHUD_v1/`). Alternatives with a root-level URL:
+Cloudflare Pages or Netlify (point them at `trade-journal/`, build
+`npm run build`, output `dist`). Note localStorage journal notes are per-origin,
+so notes saved locally won't appear on the hosted site (and vice versa).
+
 ## How it works
 
 - `trade-journal/` — Vite + React + TypeScript app.

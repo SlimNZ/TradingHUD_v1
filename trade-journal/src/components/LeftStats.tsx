@@ -1,4 +1,4 @@
-import type { JournalMonth } from '../lib/hyperliquid'
+import type { FinancialYearSummary, JournalMonth } from '../lib/hyperliquid'
 import { money, shortWallet, ago } from '../lib/format'
 
 const SESSION_LEGEND = [
@@ -40,6 +40,7 @@ function Sparkline({ values }: { values: number[] }) {
 
 interface Props {
   journal: JournalMonth
+  fySummary: FinancialYearSummary | null
   fillCount: number
   syncedAt: number
   refreshing: boolean
@@ -47,7 +48,14 @@ interface Props {
   onRefresh: () => void
 }
 
-export function LeftStats({ journal, fillCount, syncedAt, refreshing, onChangeWallet, onRefresh }: Props) {
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const fyRange = (fy: FinancialYearSummary['fy']) => {
+  const s = fy.startMonth.split('-').map(Number)
+  const e = fy.endMonth.split('-').map(Number)
+  return `${MONTH_ABBR[s[1] - 1]} ${s[0]} – ${MONTH_ABBR[e[1] - 1]} ${e[0]}`
+}
+
+export function LeftStats({ journal, fySummary, fillCount, syncedAt, refreshing, onChangeWallet, onRefresh }: Props) {
   const s = journal.summary
   return (
     <aside className="left">
@@ -87,6 +95,23 @@ export function LeftStats({ journal, fillCount, syncedAt, refreshing, onChangeWa
           <span>funding {money(s.funding)}</span>
         </div>
       </div>
+
+      {fySummary && (
+        <div className="fy-card">
+          <div className="fy-head">
+            <span className="klabel">NZ {fySummary.fy.label}</span>
+            <span className="fy-range">{fyRange(fySummary.fy)}</span>
+          </div>
+          <div className={`mono fy-net ${fySummary.netPnl >= 0 ? 'grn' : 'red'}`}>
+            {money(fySummary.netPnl)}
+          </div>
+          <div className="mono netpnl-breakdown">
+            <span>trades {money(fySummary.tradePnl)}</span>
+            <span className="sep">·</span>
+            <span>funding {money(fySummary.funding)}</span>
+          </div>
+        </div>
+      )}
 
       <div className="stat-grid">
         <div className="stat-tile">

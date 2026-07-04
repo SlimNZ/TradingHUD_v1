@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   availableMonths,
+  buildFinancialYear,
   buildMonth,
   fetchSpotMeta,
   fetchUserFills,
@@ -15,7 +16,9 @@ import { LeftStats } from './components/LeftStats'
 import { CalendarGrid } from './components/CalendarGrid'
 import { DetailPanel } from './components/DetailPanel'
 
-const TZ = 'America/New_York'
+// Calendar days + trade times are bucketed in NZ time (handles NZDT/NZST);
+// trading sessions are still classified in ET inside the data layer.
+const TZ = 'Pacific/Auckland'
 
 const stepMonth = (key: string, delta: number): string => {
   const [y, m] = key.split('-').map(Number)
@@ -140,6 +143,14 @@ export default function App() {
     [session, monthKey],
   )
 
+  const fySummary = useMemo(
+    () =>
+      session && monthKey
+        ? buildFinancialYear(session.trips, monthKey, { timezone: TZ, funding: session.fundByDay })
+        : null,
+    [session, monthKey],
+  )
+
   const months = useMemo(
     () => (session ? availableMonths(session.trips, session.funding, TZ) : []),
     [session],
@@ -162,6 +173,7 @@ export default function App() {
     <div className="app">
       <LeftStats
         journal={journal}
+        fySummary={fySummary}
         fillCount={session.fillCount}
         syncedAt={session.syncedAt}
         refreshing={refreshing}

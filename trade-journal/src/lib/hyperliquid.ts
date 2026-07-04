@@ -90,12 +90,16 @@ export interface FundingEntry {
   usdc: number // payment: negative = paid, positive = received
 }
 
-// ---- Session bucketing (windows in target tz, minutes-from-midnight) ------
+// ---- Session bucketing ----------------------------------------------------
+// Sessions are US/global MARKET windows defined in Eastern time, independent
+// of the calendar-day timezone (a NZ trader still trades "the NY open"). So
+// session is always classified from ET, even when days are bucketed in NZT.
+export const SESSION_TZ = 'America/New_York'
 const SESSIONS = [
-  { name: 'London', start: 180, end: 360 }, // 03:00–06:00
-  { name: 'NY Open', start: 570, end: 690 }, // 09:30–11:30
-  { name: 'NY PM', start: 780, end: 960 }, // 13:00–16:00
-  { name: 'Asia (Nikkei)', start: 1140, end: 1320 }, // 19:00–22:00
+  { name: 'London', start: 180, end: 360 }, // 03:00–06:00 ET
+  { name: 'NY Open', start: 570, end: 690 }, // 09:30–11:30 ET
+  { name: 'NY PM', start: 780, end: 960 }, // 13:00–16:00 ET
+  { name: 'Asia (Nikkei)', start: 1140, end: 1320 }, // 19:00–22:00 ET
 ]
 
 export function sessionForMinutes(min: number): string {
@@ -198,13 +202,14 @@ export function groupFills(
       }
     }
     realized.forEach(([iso, b], i) => {
-      const p = tzParts(b.firstCloseMs ?? t.firstMs, tz)
+      const ms = b.firstCloseMs ?? t.firstMs
+      const p = tzParts(ms, tz) // display day/time in the journal tz
       trips.push({
         iso,
         monthKey: iso.slice(0, 7),
         dayNum: parseInt(iso.slice(8), 10),
         time: p.hhmm,
-        session: sessionForMinutes(p.minutes),
+        session: sessionForMinutes(tzParts(ms, SESSION_TZ).minutes), // classify in ET
         asset: displayAsset(t.coin, spotNames),
         dir: t.dirLong ? 'LONG' : 'SHORT',
         entry,
@@ -305,6 +310,68 @@ export function availableMonths(trips: RoundTrip[], funding: FundingEntry[] = []
   const keys = new Set(trips.map((t) => t.monthKey))
   for (const f of funding) keys.add(tzParts(f.time, tz).iso.slice(0, 7))
   return [...keys].sort()
+}
+
+/**
+ * NZ financial year for a "YYYY-MM" month key. The NZ tax year runs
+ * 1 Apr – 31 Mar and is named by the year it ends: Apr 2025–Mar 2026 = FY2026.
+ * fyEndMonth defaults to 3 (March); pass another to reuse for other regimes.
+ */
+export interface FinancialYear {
+  label: string // "FY2026"
+  endYear: number // 2026
+  startMonth: string // "2025-04"
+  endMonth: string // "2026-03"
+}
+export function financialYearOf(monthKey: string, fyEndMonth = 3): FinancialYear {
+  const [y, m] = monthKey.split('-').map(Number)
+  const endYear = m > fyEndMonth ? y + 1 : y
+  const p2 = (n: number) => String(n).padStart(2, '0')
+  return {
+    label: `FY${endYear}`,
+    endYear,
+    startMonth: `${endYear - 1}-${p2(fyEndMonth + 1)}`,
+    endMonth: `${endYear}-${p2(fyEndMonth)}`,
+  }
+}
+
+export interface FinancialYearSummary {
+  fy: FinancialYear
+  netPnl: number // trades (net of fees) + funding
+  tradePnl: number
+  funding: number
+  trades: number
+}
+
+/** Sum a financial year's totals across every month it contains. */
+export function buildFinancialYear(
+  trips: RoundTrip[],
+  monthKey: string,
+  opts: BuildMonthOpts = {},
+): FinancialYearSummary {
+  const fy = financialYearOf(monthKey)
+  const funding = opts.funding ?? {}
+  const monthsInFy = new Set<string>()
+  for (const t of trips) if (t.monthKey >= fy.startMonth && t.monthKey <= fy.endMonth) monthsInFy.add(t.monthKey)
+  for (const iso of Object.keys(funding)) {
+    const mk = iso.slice(0, 7)
+    if (mk >= fy.startMonth && mk <= fy.endMonth && Math.abs(funding[iso]) > 1e-9) monthsInFy.add(mk)
+  }
+  let netPnl = 0, tradePnl = 0, fundingTot = 0, trades = 0
+  for (const mk of monthsInFy) {
+    const m = buildMonth(trips, mk, opts)
+    netPnl += m.summary.netPnl
+    tradePnl += m.summary.tradePnl
+    fundingTot += m.summary.funding
+    trades += m.summary.trades
+  }
+  return {
+    fy,
+    netPnl: Math.round(netPnl * 100) / 100,
+    tradePnl: Math.round(tradePnl * 100) / 100,
+    funding: Math.round(fundingTot * 100) / 100,
+    trades,
+  }
 }
 
 /** Sum funding payments per calendar day (iso date in the journal tz). */

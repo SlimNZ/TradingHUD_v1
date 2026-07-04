@@ -53,15 +53,26 @@ still appear (funding accrues on open positions). TP/SL display is supported
 by the UI but not populated from fills — wire resting trigger orders if you
 want it.
 
-## Tax reconciliation
+## Tax reconciliation (NZ / IRD)
+
+Calendar days and trade times are bucketed in **NZ time** (`Pacific/Auckland`,
+auto NZDT/NZST); trading sessions (NY Open, London, …) are still classified in
+ET since those are US/global market windows. The left pane shows a **NZ
+financial-year** total (1 Apr – 31 Mar, named by the end year: Apr 2025–Mar
+2026 = FY2026) for the FY containing the month on screen, split into trades vs
+funding.
 
 Reconciled against Hyperliquid CSV exports (trade history, funding history,
-deposits/withdrawals) at the grand-total level: trade P&L matches 99.97% and
-funding 100%. Notes for anyone auditing: the CSV `closedPnl` column is
-already **net of fees** (don't subtract fees again); CSV timestamps are in
-**local time** (this account's exports are NZ, UTC+12/+13), while the app
-buckets days in `America/New_York` — totals are tz-independent but per-day
-and per-month attribution near midnight can shift, and tax-year boundaries
-(e.g. NZ 1 Apr–31 Mar) should be computed in local time. The app reads the
-public API (~10k most recent fills); accounts with longer histories should
-reconcile against the full CSV export.
+deposits/withdrawals):
+- All-time, incl. funding: **99.97%** (trade P&L 99.97%, funding 100%).
+- **FY2026** (1 Apr 2025 – 31 Mar 2026): **99.91%** (trade 99.92%, funding 100%).
+
+Notes for anyone auditing: the CSV `closedPnl` column is already **net of
+fees** (don't subtract fees again); CSV timestamps are already NZ local time.
+Residual gaps (<0.1%) are opening fees on positions still open at the data
+window's end, which are booked when those positions close. The app reads the
+public API (~10k most recent fills); this account fits fully, but accounts
+with longer histories should reconcile against the complete CSV export. P&L is
+trading P&L + funding; deposits/withdrawals are cash flow, not taxable P&L.
+Spot vs perp/derivative gains may be taxed differently — reconcile the split
+against the CSV's order-type column if your return needs it.

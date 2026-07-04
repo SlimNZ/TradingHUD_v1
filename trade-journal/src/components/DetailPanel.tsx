@@ -24,7 +24,7 @@ function TradeCard({ t }: { t: Trade }) {
           </span>
         )}
         <span className="ttime">
-          {t.time} ET
+          {t.time} NZT
           <br />
           {t.session}
         </span>

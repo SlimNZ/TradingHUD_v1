@@ -24,6 +24,19 @@ Click a day, then any trade card, to add:
 - A free-text **note** per trade and a **daily review** note for the day.
 - A **grade** (A/B/C), a **followed plan** toggle, and a **setup** tag.
 
+### Risk tools
+
+- **Exposure meter** (left pane): live total perp notional vs a configurable
+  cap, split into crypto-beta vs other (HIP-3/equities) buckets. Green under
+  75%, amber to 100%, red over. Click it to open the risk panel.
+- **⚖ Risk** panel (calendar header): set your portfolio/notional cap and
+  risk-per-trade %, see live exposure vs cap, and a **position-size
+  calculator** — enter price + stop and it returns size, notional, leverage,
+  and whether the trade breaks your cap or remaining budget. Size = risk ÷
+  stop distance. Cap/risk settings persist on the device.
+
+### Journaling
+
 The **📊 Stats** button (calendar header) summarizes all reviewed trades:
 rule-adherence rate, and win rate + expectancy (avg net P&L per trade) broken
 down by setup, session, and grade. Notes and grades are stored in the browser's

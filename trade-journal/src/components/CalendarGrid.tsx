@@ -83,6 +83,7 @@ interface Props {
   canNext: boolean
   onOpenStats: () => void
   onOpenPositions: () => void
+  onOpenRisk: () => void
   positionCount: number | null
 }
 
@@ -96,6 +97,7 @@ export function CalendarGrid({
   canNext,
   onOpenStats,
   onOpenPositions,
+  onOpenRisk,
   positionCount,
 }: Props) {
   const weeks = useMemo(() => buildWeeks(journal.monthKey, journal.days), [journal])
@@ -116,6 +118,9 @@ export function CalendarGrid({
             ◆ Positions{positionCount > 0 ? ` (${positionCount})` : ''}
           </button>
         )}
+        <button className="stats-btn" onClick={onOpenRisk}>
+          ⚖ Risk
+        </button>
         <button className="stats-btn" onClick={onOpenStats}>
           📊 Stats
         </button>

@@ -15,6 +15,9 @@ import { loadMeta, loadNotes, persistMeta, persistNotes } from './lib/notes'
 import type { MetaMap, NoteMap, TradeMeta } from './lib/notes'
 import { StatsPanel } from './components/StatsPanel'
 import { PositionsPanel } from './components/PositionsPanel'
+import { RiskPanel } from './components/RiskPanel'
+import { loadRiskConfig, saveRiskConfig } from './lib/risk'
+import type { RiskConfig } from './lib/risk'
 import { DEMO_FILL_COUNT, DEMO_WALLET, demoTags, demoTrips } from './lib/demo'
 import { ConnectGate } from './components/ConnectGate'
 import { LeftStats } from './components/LeftStats'
@@ -51,6 +54,8 @@ export default function App() {
   const [selected, setSelected] = useState<number | null>(null)
   const [showStats, setShowStats] = useState(false)
   const [showPositions, setShowPositions] = useState(false)
+  const [showRisk, setShowRisk] = useState(false)
+  const [riskConfig, setRiskConfig] = useState<RiskConfig>(() => loadRiskConfig())
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -175,6 +180,11 @@ export default function App() {
     setError(null)
   }
 
+  const saveRisk = (cfg: RiskConfig) => {
+    setRiskConfig(cfg)
+    saveRiskConfig(cfg)
+  }
+
   const journal = useMemo(
     () =>
       session && monthKey
@@ -219,11 +229,14 @@ export default function App() {
       <LeftStats
         journal={journal}
         fySummary={fySummary}
+        positions={session.positions}
+        riskConfig={riskConfig}
         fillCount={session.fillCount}
         syncedAt={session.syncedAt}
         refreshing={refreshing}
         onChangeWallet={disconnect}
         onRefresh={refresh}
+        onOpenRisk={() => setShowRisk(true)}
       />
       <CalendarGrid
         journal={journal}
@@ -235,6 +248,7 @@ export default function App() {
         canNext={canNext}
         onOpenStats={() => setShowStats(true)}
         onOpenPositions={() => setShowPositions(true)}
+        onOpenRisk={() => setShowRisk(true)}
         positionCount={
           session.positions ? session.positions.perps.length + session.positions.spot.length : null
         }
@@ -257,6 +271,14 @@ export default function App() {
           positions={session.positions}
           syncedAt={session.syncedAt}
           onClose={() => setShowPositions(false)}
+        />
+      )}
+      {showRisk && (
+        <RiskPanel
+          config={riskConfig}
+          positions={session.positions}
+          onChange={saveRisk}
+          onClose={() => setShowRisk(false)}
         />
       )}
     </div>

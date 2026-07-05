@@ -1,5 +1,7 @@
-import type { FinancialYearSummary, JournalMonth } from '../lib/hyperliquid'
-import { money, shortWallet, ago } from '../lib/format'
+import type { FinancialYearSummary, JournalMonth, OpenPositions } from '../lib/hyperliquid'
+import { money, shortWallet, ago, usd } from '../lib/format'
+import { computeExposure } from '../lib/risk'
+import type { RiskConfig } from '../lib/risk'
 
 const SESSION_LEGEND = [
   { color: '#e0b64a', label: 'NY Open · 09:30 ET' },
@@ -41,11 +43,14 @@ function Sparkline({ values }: { values: number[] }) {
 interface Props {
   journal: JournalMonth
   fySummary: FinancialYearSummary | null
+  positions: OpenPositions | null
+  riskConfig: RiskConfig
   fillCount: number
   syncedAt: number
   refreshing: boolean
   onChangeWallet: () => void
   onRefresh: () => void
+  onOpenRisk: () => void
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -55,7 +60,60 @@ const fyRange = (fy: FinancialYearSummary['fy']) => {
   return `${MONTH_ABBR[s[1] - 1]} ${s[0]} – ${MONTH_ABBR[e[1] - 1]} ${e[0]}`
 }
 
-export function LeftStats({ journal, fySummary, fillCount, syncedAt, refreshing, onChangeWallet, onRefresh }: Props) {
+// Live perp notional vs your cap: green under 75%, amber to 100%, red over.
+function ExposureMeter({
+  positions,
+  cap,
+  onClick,
+}: {
+  positions: OpenPositions
+  cap: number
+  onClick: () => void
+}) {
+  const ex = computeExposure(positions)
+  const ratio = cap > 0 ? ex.totalPerp / cap : 0
+  const pct = Math.round(ratio * 100)
+  const tone = ratio > 1 ? 'over' : ratio > 0.75 ? 'warn' : 'ok'
+  return (
+    <button className={`exposure exposure-${tone}`} onClick={onClick} title="Open risk tools">
+      <div className="exposure-head">
+        <span className="klabel">Exposure · perp notional</span>
+        <span className="exposure-pct mono">{pct}%</span>
+      </div>
+      <div className="exposure-bar">
+        <div className="exposure-fill" style={{ width: `${Math.min(100, pct)}%` }} />
+        {ratio > 1 && <div className="exposure-over-flag" />}
+      </div>
+      <div className="exposure-nums mono">
+        {usd(ex.totalPerp)} / {usd(cap)}
+      </div>
+      {(ex.crypto > 0 || ex.other > 0) && (
+        <div className="exposure-buckets mono">
+          <span>crypto {usd(ex.crypto)}</span>
+          {ex.other > 0 && (
+            <>
+              <span className="sep">·</span>
+              <span>other {usd(ex.other)}</span>
+            </>
+          )}
+        </div>
+      )}
+    </button>
+  )
+}
+
+export function LeftStats({
+  journal,
+  fySummary,
+  positions,
+  riskConfig,
+  fillCount,
+  syncedAt,
+  refreshing,
+  onChangeWallet,
+  onRefresh,
+  onOpenRisk,
+}: Props) {
   const s = journal.summary
   return (
     <aside className="left">
@@ -83,6 +141,10 @@ export function LeftStats({ journal, fySummary, fillCount, syncedAt, refreshing,
           </button>
         </div>
       </div>
+
+      {positions && (
+        <ExposureMeter positions={positions} cap={riskConfig.portfolioCap} onClick={onOpenRisk} />
+      )}
 
       <div>
         <div className="klabel" style={{ marginBottom: 7 }}>

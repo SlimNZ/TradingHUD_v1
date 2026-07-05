@@ -82,6 +82,8 @@ interface Props {
   canPrev: boolean
   canNext: boolean
   onOpenStats: () => void
+  onOpenPositions: () => void
+  positionCount: number | null
 }
 
 export function CalendarGrid({
@@ -93,6 +95,8 @@ export function CalendarGrid({
   canPrev,
   canNext,
   onOpenStats,
+  onOpenPositions,
+  positionCount,
 }: Props) {
   const weeks = useMemo(() => buildWeeks(journal.monthKey, journal.days), [journal])
   return (
@@ -107,6 +111,11 @@ export function CalendarGrid({
             ›
           </button>
         </div>
+        {positionCount != null && (
+          <button className="stats-btn" onClick={onOpenPositions}>
+            ◆ Positions{positionCount > 0 ? ` (${positionCount})` : ''}
+          </button>
+        )}
         <button className="stats-btn" onClick={onOpenStats}>
           📊 Stats
         </button>

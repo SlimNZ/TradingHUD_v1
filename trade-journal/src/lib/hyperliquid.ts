@@ -640,3 +640,128 @@ export async function fetchSpotMeta(): Promise<Record<string, string>> {
     return {}
   }
 }
+
+// ---- Open positions (current holdings, unrealized) -------------------------
+export interface PerpPosition {
+  coin: string
+  dir: 'LONG' | 'SHORT'
+  size: number // absolute
+  entryPx: number
+  markPx: number
+  positionValue: number
+  unrealizedPnl: number
+  roe: number // return on equity, fraction (0.10 = +10%)
+  leverage: number
+  liquidationPx: number | null
+  fundingSinceOpen: number // cumulative funding since the position opened (neg = paid)
+}
+
+export interface SpotHolding {
+  coin: string
+  size: number
+  entryNtl: number // cost basis (USD notional at entry); 0 = unknown (bridged/deposited)
+  currentValue: number
+  unrealizedPnl: number | null // null when cost basis is unknown
+}
+
+export interface OpenPositions {
+  accountValue: number // perp account value (margin summary)
+  perps: PerpPosition[]
+  spot: SpotHolding[]
+  totalUnrealized: number // perps + spot with a known cost basis
+  spotValue: number // total current value of shown spot holdings
+  hiddenSpotDust: number // count of sub-threshold spot holdings not shown
+}
+
+interface ClearinghouseState {
+  marginSummary: { accountValue: string }
+  assetPositions: {
+    position: {
+      coin: string
+      szi: string
+      leverage: { value: number }
+      entryPx: string
+      positionValue: string
+      unrealizedPnl: string
+      returnOnEquity: string
+      liquidationPx: string | null
+      cumFunding: { sinceOpen: string }
+    }
+  }[]
+}
+interface SpotState {
+  balances: { coin: string; token: number; total: string; entryNtl: string }[]
+}
+
+const SPOT_DUST_USD = 1 // hide spot holdings worth less than this
+
+/**
+ * Fetch current open positions: perps (with unrealized P&L, leverage, liq
+ * price) and spot holdings (cost basis vs live value). Excludes USDC cash and
+ * sub-$1 spot dust. These are live account state, not part of the realized
+ * journal.
+ */
+export async function fetchOpenPositions(wallet: string): Promise<OpenPositions> {
+  const [ch, spotState, mids, meta] = (await Promise.all([
+    infoRequest({ type: 'clearinghouseState', user: wallet }),
+    infoRequest({ type: 'spotClearinghouseState', user: wallet }),
+    infoRequest({ type: 'allMids' }),
+    infoRequest({ type: 'spotMeta' }),
+  ])) as [ClearinghouseState, SpotState, Record<string, string>, SpotMeta]
+
+  const perps: PerpPosition[] = (ch.assetPositions ?? []).map(({ position: p }) => {
+    const szi = parseFloat(p.szi)
+    const liq = p.liquidationPx ? parseFloat(p.liquidationPx) : null
+    return {
+      coin: p.coin,
+      dir: szi >= 0 ? 'LONG' : 'SHORT',
+      size: Math.abs(szi),
+      entryPx: parseFloat(p.entryPx),
+      markPx: mids[p.coin] !== undefined ? parseFloat(mids[p.coin]) : 0,
+      positionValue: parseFloat(p.positionValue),
+      unrealizedPnl: parseFloat(p.unrealizedPnl),
+      roe: parseFloat(p.returnOnEquity),
+      leverage: p.leverage?.value ?? 0,
+      liquidationPx: liq,
+      fundingSinceOpen: parseFloat(p.cumFunding?.sinceOpen ?? '0'),
+    }
+  })
+
+  // Spot: map each token to its USDC pair mid to value the holding.
+  const pairByBase = new Map<number, string>()
+  for (const u of meta.universe) pairByBase.set(u.tokens[0], u.name)
+
+  const spot: SpotHolding[] = []
+  let hiddenSpotDust = 0
+  for (const b of spotState.balances ?? []) {
+    if (b.coin === 'USDC') continue // cash, not a position
+    const size = parseFloat(b.total)
+    const pair = pairByBase.get(b.token)
+    const mid = pair && mids[pair] !== undefined ? parseFloat(mids[pair]) : 0
+    const currentValue = size * mid
+    const entryNtl = parseFloat(b.entryNtl || '0')
+    if (currentValue < SPOT_DUST_USD) {
+      hiddenSpotDust += 1
+      continue
+    }
+    // entryNtl of 0 = no recorded cost basis (bridged/deposited/airdropped);
+    // don't claim its full value as profit — mark unrealized unknown.
+    const unrealizedPnl = entryNtl > 0.01 ? currentValue - entryNtl : null
+    spot.push({ coin: b.coin, size, entryNtl, currentValue, unrealizedPnl })
+  }
+  spot.sort((a, b) => b.currentValue - a.currentValue)
+
+  const totalUnrealized =
+    perps.reduce((s, p) => s + p.unrealizedPnl, 0) +
+    spot.reduce((s, h) => s + (h.unrealizedPnl ?? 0), 0)
+  const spotValue = spot.reduce((s, h) => s + h.currentValue, 0)
+
+  return {
+    accountValue: parseFloat(ch.marginSummary?.accountValue ?? '0'),
+    perps,
+    spot,
+    totalUnrealized,
+    spotValue,
+    hiddenSpotDust,
+  }
+}

@@ -294,3 +294,16 @@ button { font-family: inherit; }
 .stats-table td.lbl { font-family: system-ui; color: #dfe1e5; }
 .stats-empty { font: 500 11px/1.4 system-ui; color: #767b85; }
 .stats-foot { font: 500 10px/1.5 system-ui; color: #6b7079; margin-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 12px; }
+
+/* open positions */
+.pos-summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; margin-bottom: 16px; }
+.pos-sum-tile { border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 10px 11px; background: #16181c; }
+.pos-sum-val { font-weight: 700; font-size: 19px; line-height: 1.1; margin-top: 5px; }
+.pos-sum-val.sm { font-size: 14px; color: #dfe1e5; }
+.pos-list { display: flex; flex-direction: column; gap: 8px; }
+.pos-card { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 9px; padding: 10px 12px; background: #17191d; }
+.pos-row1 { display: flex; align-items: center; gap: 8px; }
+.pos-lev { font: 600 9px/1 'JetBrains Mono', monospace; color: #8b909a; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 4px; padding: 2px 5px; }
+.pos-upnl { margin-left: auto; font-weight: 700; font-size: 13px; }
+.pos-roe { font-weight: 500; font-size: 10px; opacity: 0.8; }
+.pos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px 12px; margin-top: 9px; font-size: 10.5px; color: #9aa0aa; }

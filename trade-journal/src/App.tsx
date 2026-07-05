@@ -3,16 +3,18 @@ import {
   availableMonths,
   buildFinancialYear,
   buildMonth,
+  fetchOpenPositions,
   fetchSpotMeta,
   fetchUserFills,
   fetchUserFunding,
   fundingByDay,
   groupFills,
 } from './lib/hyperliquid'
-import type { FundingEntry, RoundTrip } from './lib/hyperliquid'
+import type { FundingEntry, OpenPositions, RoundTrip } from './lib/hyperliquid'
 import { loadMeta, loadNotes, persistMeta, persistNotes } from './lib/notes'
 import type { MetaMap, NoteMap, TradeMeta } from './lib/notes'
 import { StatsPanel } from './components/StatsPanel'
+import { PositionsPanel } from './components/PositionsPanel'
 import { DEMO_FILL_COUNT, DEMO_WALLET, demoTags, demoTrips } from './lib/demo'
 import { ConnectGate } from './components/ConnectGate'
 import { LeftStats } from './components/LeftStats'
@@ -34,6 +36,7 @@ interface Session {
   trips: RoundTrip[]
   funding: FundingEntry[]
   fundByDay: Record<string, number>
+  positions: OpenPositions | null
   fillCount: number
   syncedAt: number
   isDemo: boolean
@@ -47,6 +50,7 @@ export default function App() {
   const [monthKey, setMonthKey] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
   const [showStats, setShowStats] = useState(false)
+  const [showPositions, setShowPositions] = useState(false)
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,10 +60,11 @@ export default function App() {
     if (!/^0x[0-9a-fA-F]{40}$/.test(w)) {
       throw new Error('That does not look like a wallet address (expected 0x + 40 hex characters).')
     }
-    const [fills, spotNames, funding] = await Promise.all([
+    const [fills, spotNames, funding, positions] = await Promise.all([
       fetchUserFills(w),
       fetchSpotMeta(),
       fetchUserFunding(w),
+      fetchOpenPositions(w).catch(() => null), // non-fatal: journal still loads
     ])
     if (!fills.length) {
       throw new Error(
@@ -75,6 +80,7 @@ export default function App() {
       trips,
       funding,
       fundByDay: fundingByDay(funding, TZ),
+      positions,
       fillCount: fills.length,
       syncedAt: Date.now(),
       isDemo: false,
@@ -107,6 +113,7 @@ export default function App() {
       trips: demoTrips(),
       funding: [],
       fundByDay: {},
+      positions: null,
       fillCount: DEMO_FILL_COUNT,
       syncedAt: Date.now(),
       isDemo: true,
@@ -227,6 +234,10 @@ export default function App() {
         canPrev={canPrev}
         canNext={canNext}
         onOpenStats={() => setShowStats(true)}
+        onOpenPositions={() => setShowPositions(true)}
+        positionCount={
+          session.positions ? session.positions.perps.length + session.positions.spot.length : null
+        }
       />
       {selectedDay && (
         <DetailPanel
@@ -240,6 +251,13 @@ export default function App() {
       )}
       {showStats && (
         <StatsPanel trips={session.trips} meta={meta} onClose={() => setShowStats(false)} />
+      )}
+      {showPositions && session.positions && (
+        <PositionsPanel
+          positions={session.positions}
+          syncedAt={session.syncedAt}
+          onClose={() => setShowPositions(false)}
+        />
       )}
     </div>
   )

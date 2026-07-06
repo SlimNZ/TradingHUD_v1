@@ -16,6 +16,7 @@ import type { MetaMap, NoteMap, TradeMeta } from './lib/notes'
 import { StatsPanel } from './components/StatsPanel'
 import { PositionsPanel } from './components/PositionsPanel'
 import { RiskPanel } from './components/RiskPanel'
+import { RulesPanel } from './components/RulesPanel'
 import { loadRiskConfig, saveRiskConfig } from './lib/risk'
 import type { RiskConfig } from './lib/risk'
 import { DEMO_FILL_COUNT, DEMO_WALLET, demoTags, demoTrips } from './lib/demo'
@@ -55,6 +56,7 @@ export default function App() {
   const [showStats, setShowStats] = useState(false)
   const [showPositions, setShowPositions] = useState(false)
   const [showRisk, setShowRisk] = useState(false)
+  const [showRules, setShowRules] = useState(false)
   const [riskConfig, setRiskConfig] = useState<RiskConfig>(() => loadRiskConfig())
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -237,6 +239,7 @@ export default function App() {
         onChangeWallet={disconnect}
         onRefresh={refresh}
         onOpenRisk={() => setShowRisk(true)}
+        onOpenRules={() => setShowRules(true)}
       />
       <CalendarGrid
         journal={journal}
@@ -281,6 +284,7 @@ export default function App() {
           onClose={() => setShowRisk(false)}
         />
       )}
+      {showRules && <RulesPanel onClose={() => setShowRules(false)} />}
     </div>
   )
 }

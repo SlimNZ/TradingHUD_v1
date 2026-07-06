@@ -24,6 +24,13 @@ Click a day, then any trade card, to add:
 - A free-text **note** per trade and a **daily review** note for the day.
 - A **grade** (A/B/C), a **followed plan** toggle, and a **setup** tag.
 
+### Trading rules
+
+A **📋 Trading rules** link under the "TRADE JOURNAL" title opens your personal
+perps/leverage risk playbook (position sizing, exposure cap, stops, pre-trade
+checklist). Edit [`trade-journal/src/rules.md`](trade-journal/src/rules.md) —
+it's the single source of truth and renders in-app; add to it over time.
+
 ### Risk tools
 
 - **Exposure meter** (left pane): live total perp notional vs a configurable

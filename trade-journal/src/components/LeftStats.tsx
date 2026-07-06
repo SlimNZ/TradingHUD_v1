@@ -51,6 +51,7 @@ interface Props {
   onChangeWallet: () => void
   onRefresh: () => void
   onOpenRisk: () => void
+  onOpenRules: () => void
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -113,6 +114,7 @@ export function LeftStats({
   onChangeWallet,
   onRefresh,
   onOpenRisk,
+  onOpenRules,
 }: Props) {
   const s = journal.summary
   return (
@@ -120,6 +122,9 @@ export function LeftStats({
       <div>
         <div className="left-title">TRADE JOURNAL</div>
         <div className="left-month">{journal.month}</div>
+        <button className="rules-link" onClick={onOpenRules}>
+          📋 Trading rules
+        </button>
       </div>
 
       <div className="source-card">
